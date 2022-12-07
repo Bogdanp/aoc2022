@@ -12,9 +12,9 @@
       (string-append "/" b)
       (string-append a "/" b)))
 
-(define (split a)
+(define (dirname a)
   (define parts (reverse (string-split a "/")))
-  (values (string-append "/" (string-join (reverse (cdr parts)) "/")) (car parts)))
+  (string-append "/" (string-join (reverse (cdr parts)) "/")))
 
 (define root
   (call-with-input-file "day07.txt"
@@ -24,10 +24,7 @@
       (for/fold ([curr "/"])
                 ([line (in-lines in)])
         (match line
-          ["$ cd .."
-           (define-values (dir _)
-             (split curr))
-           dir]
+          ["$ cd .." (dirname curr)]
           ["$ cd /" "/"]
           [(regexp #rx"\\$ cd (.+)" (list _ name))
            (join curr name)]
@@ -37,20 +34,17 @@
                (match (peek-char in)
                  [(or #\$ (? eof-object?))
                   (reverse children)]
-                 [_
-                  (define ls-line
-                    (read-line in))
-                  (match ls-line
-                    [(regexp #rx"dir (.+)" (list _ name))
-                     (define p (join curr name))
-                     (define e (dirent p null))
-                     (hash-set! ents p e)
-                     (loop (cons p children))]
-                    [(regexp #rx"(.+) (.+)" (list _ (app string->number size) name))
-                     (define p (join curr name))
-                     (define e (filent p size))
-                     (hash-set! ents p e)
-                     (loop (cons p children))])])))
+                 [_ (match (read-line in)
+                      [(regexp #rx"dir (.+)" (list _ name))
+                       (define p (join curr name))
+                       (define e (dirent p null))
+                       (hash-set! ents p e)
+                       (loop (cons p children))]
+                      [(regexp #rx"(.+) (.+)" (list _ (app string->number size) name))
+                       (define p (join curr name))
+                       (define e (filent p size))
+                       (hash-set! ents p e)
+                       (loop (cons p children))])])))
            (begin0 curr
              (hash-update! ents curr (λ (e) (struct-copy dirent e [children children]))))]))
       (let loop ([e (hash-ref ents "/")])
@@ -85,7 +79,7 @@
       (let loop ([e root])
         (match e
           [(filent _ _ ) null]
-          [(dirent name children)
+          [(dirent _ children)
            (if (>= (dirsize e) need)
                (apply append (list e) (map loop children))
                null)])))
